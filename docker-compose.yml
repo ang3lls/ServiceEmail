@@ -1,0 +1,72 @@
+version: '3.3'
+
+services:
+  swagger-ui:
+    image: swaggerapi/swagger-ui:v3.26.0
+    volumes:
+      - ./src/main/swagger:/usr/share/nginx/html/yml
+    environment:
+      - BASE_URL=/
+      - SWAGGER_JSON=/usr/share/nginx/html/yml/OpenapiSpecification.yml
+    ports:
+      - 8383:8080
+
+  kafka:
+    image: landoop/fast-data-dev
+    environment:
+      - ADV_HOST=127.0.0.1
+      - BROWSECONFIGS=1
+    volumes:
+      - ~/localstack/landoop/data/:/data/
+    ports:
+      - "2181:2181"
+      - "3030:3030"
+      - "8081-8083:8081-8083"
+      - "9581-9585:9581-9585"
+      - "9092:9092"
+    networks:
+      - localstack
+
+  localstack:
+    image: localstack/localstack:0.11.3
+    container_name: receivable-terraform
+    ports:
+      - "4569:4569"
+      - "4570:4570"
+      - "4574:4574"
+      - "4572:4572"
+      - "4586:4586"
+      - "4568:4568"
+      - "4582:4582"
+      - "4587:4587"
+      - "${PORT_WEB_UI-8181}:${PORT_WEB_UI-8080}"
+    environment:
+      - SERVICES=dynamodb,dynamodbstreams,lambda,s3,logs,kinesis,kinesisanalytics,cloudwatchevents,cloudwatchlogs,cloudwatch,EventBridge
+      - DEBUG=${DEBUG- }
+      - DATA_DIR=/data
+      - PORT_WEB_UI=${PORT_WEB_UI- }
+      - LAMBDA_EXECUTOR=${LAMBDA_EXECUTOR- }
+      - KINESIS_ERROR_PROBABILITY=${KINESIS_ERROR_PROBABILITY- }
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - LAMBDA_DOCKER_NETWORK=receivables-settlement-lambda_localstack
+    volumes:
+      - "~/localstack/conf:/tmp"
+      - "~/localstack/data:/data"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    links:
+      - kafka:kafka
+    networks:
+      - localstack
+
+  dynamo-admin:
+    image: aaronshaf/dynamodb-admin
+    environment:
+      - DYNAMO_ENDPOINT=http://localstack:4569
+    ports:
+      - 8001:8001
+    networks:
+      - localstack
+
+networks:
+  localstack:
+    driver: bridge
